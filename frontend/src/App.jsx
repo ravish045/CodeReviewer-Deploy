@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import axios from 'axios';
+import Login from "./pages/login";
 import { Sparkles, Code2, RotateCcw, Bug, Wand2, Copy } from 'lucide-react';
+import { motion } from "framer-motion";
+import toast from "react-hot-toast";
 
 function App() {
+  const [user, setUser] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [token, setToken] = useState(localStorage.getItem("token"));
   const [language, setLanguage] = useState("javascript");
   const [code, setCode] = useState("");
   const [review, setReview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [editorRef, setEditorRef] = useState(null);
+  const [isGuest, setIsGuest] = useState(false);
+  const API = "http://localhost:5000";
 
   const templates = {
     javascript: `function helloWorld() {\n  console.log("Hello Ravish");\n}`,
@@ -17,55 +25,80 @@ function App() {
     c: `#include <stdio.h>\nint main() {\n  int a = 10, b = 0;\n  printf("%d", a / b);\n  return 0;\n}`,
      java: `class Main {\n  public static void main(String[] args) {\n    int a = 10, b = 0;\n    System.out.println(a / b);\n  }\n}`
   };
+ useEffect(() => {
+  if (token && token !== "guest") {
+    axios.get(`${API}/api/me`, {
+      headers: { Authorization: token }
+    }).then(res => setUser(res.data));
+
+    axios.get(`${API}/api/history`, {
+      headers: { Authorization: token }
+    }).then(res => setHistory(res.data));
+  } else {
+    setUser(null);
+    setHistory([]);
+  }
+}, [token]);
+
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const urlToken = params.get("token");
+  
+  if (urlToken) {
+    localStorage.setItem("token", urlToken);
+    setToken(urlToken);
+  }
+}, []);
 
   useEffect(() => {
     setCode(templates[language]);
     setReview(null);
   }, [language]);
 
-  // 🔥 Load history
-  const [history, setHistory] = useState(() => {
-    return JSON.parse(localStorage.getItem("history")) || [];
-  });
+ 
 
-  const saveToHistory = (data) => {
-    const updated = [data, ...history.slice(0, 4)];
-    setHistory(updated);
-    localStorage.setItem("history", JSON.stringify(updated));
-  };
+  
 
   const handleReview = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.post("https://codereviewer-8xzy.onrender.com/api/review", {
+      const { data } = await axios.post(`${API}/api/review`, {
         code,
-        language
-      });
+        language,
+        
+      },
+    {
+      headers: {
+          Authorization: token
+        }
+    });
+      
 
       setReview(data);
-      saveToHistory(data);
+      
 
       // 🔴 Highlight simple error (example: division by zero)
       if (editorRef && code.includes("/ 0")) {
         const model = editorRef.getModel();
         window.monaco.editor.setModelMarkers(model, "owner", [
           {
-            startLineNumber: 1,
-            startColumn: 1,
+            startLineNumber: 2,
+            startColumn: 2,
             endLineNumber: 5,
-            endColumn: 1,
+            endColumn: 2,
             message: "Possible division by zero",
             severity: window.monaco.MarkerSeverity.Error
           }
         ]);
       }
 
-    } catch {
-      alert("Backend error!");
-    }
+    } catch (err) {
+  console.log("ERROR 👉", err.response?.data || err.message);
+  alert("Backend error!");
+}
     setLoading(false);
   };
-
+  
   const handleFixCode = () => {
     if (review?.optimizedCode) {
       setCode(review.optimizedCode);
@@ -74,10 +107,21 @@ function App() {
 
   const copyCode = () => {
     navigator.clipboard.writeText(review?.optimizedCode || "");
+    toast.success("Copied!");
   };
-
+  if (!token && !isGuest) {
+    return <Login setToken={setToken} setIsGuest={setIsGuest} />;
+  }
+  
+  
   return (
-    <div className="h-screen flex flex-col bg-[#050505] text-slate-300">
+    
+    <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+    className="h-screen flex flex-col bg-[#050505] text-slate-300"
+  >
 
       {/* Header */}
       <nav className="h-16 border-b border-white/10 flex items-center justify-between px-8 bg-[#0a0a0a]">
@@ -100,23 +144,56 @@ function App() {
             <option value="c">C</option>
             <option value="java">Java</option>
           </select>
+          <div className="flex items-center gap-4">
 
-          <button
-            onClick={handleReview}
-            disabled={loading}
-            className="bg-blue-600 px-5 py-2 rounded flex items-center gap-2"
-          >
+  {user && (
+    <span className="text-sm text-slate-400">
+      {user.email}
+    </span>
+  )}
+
+  <button
+    onClick={() => {
+      localStorage.removeItem("token");
+      setToken(null);
+      setUser(null);
+      setIsGuest(false);
+    }}
+    className="bg-red-600 px-3 py-1 rounded"
+  >
+    Logout
+  </button>
+
+</div>
+
+          <motion.button
+  whileHover={{ scale: 1.05 }}
+  whileTap={{ scale: 0.95 }}
+  onClick={handleReview}
+  className="bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2 rounded flex items-center gap-2"
+>
             {loading ? <RotateCcw className="animate-spin" /> : <Sparkles />}
             Review
-          </button>
+          </motion.button>
         </div>
       </nav>
 
       {/* Main */}
       <main className="flex flex-1 p-4 gap-4">
+        <div className="relative">
+  <div className="pointer-events-none fixed inset-0 z-0">
+    <div className="absolute w-96 h-96 bg-blue-500/10 blur-3xl rounded-full top-1/4 left-1/4"></div>
+  </div>
+</div>
 
         {/* Editor */}
-        <div className="flex-1 border border-white/10 rounded-xl overflow-hidden">
+        <motion.div
+  key={language}
+  initial={{ opacity: 0 }}
+  animate={{ opacity: 1 }}
+  transition={{ duration: 0.3 }}
+  className="flex-1 border border-white/10 rounded-xl overflow-hidden"
+>
           <Editor
             height="100%"
             theme="vs-dark"
@@ -125,20 +202,30 @@ function App() {
             onMount={(editor) => setEditorRef(editor)}
             onChange={(val) => setCode(val)}
           />
-        </div>
+        </motion.div>
 
         {/* Output */}
-        <div className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl p-6 overflow-y-auto">
+        <motion.div
+  whileHover={{ scale: 1.01 }}
+  className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-xl p-6 overflow-y-auto"
+>
 
           {!review && !loading && <p className="text-slate-600">Run review to see results</p>}
 
           {loading && <p>Analyzing...</p>}
 
           {review && (
-            <div className="space-y-6">
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.4 }}
+    className="space-y-6"
+  >
 
-              <h2 className="text-blue-400 text-sm">Review Summary</h2>
-              <p className="text-white italic">{review.summary}</p>
+              <div className="bg-white/5 p-3 rounded">
+  <p className="text-sm text-blue-400 mb-1">Summary</p>
+  <p className="text-white">{review.summary}</p>
+</div>
 
               <div>
                 <h3 className="text-slate-400 text-sm mb-2">Improvements</h3>
@@ -169,21 +256,37 @@ function App() {
 
               {/* History */}
               <div>
-                <h3 className="text-slate-400 text-sm mt-6 mb-2">Recent Reviews</h3>
-                {history.map((item, i) => (
-                  <div key={i} className="text-xs text-slate-500 border-b border-white/10 py-1">
-                    {item.summary}
-                  </div>
-                ))}
-              </div>
+  <h3 className="text-slate-400 text-sm mt-6 mb-2">History</h3>
 
-            </div>
+  {!token && (
+    <p className="text-xs text-red-400">
+      Login to save and view history
+    </p>
+  )}
+
+  {token && history.length === 0 && (
+    <p className="text-xs text-slate-500">No history yet</p>
+  )}
+
+  {history.map((item, i) => (
+    <div
+      key={i}
+      className="p-3 bg-white/5 rounded mb-2 cursor-pointer hover:bg-white/10"
+      onClick={() => setCode(item.code)}
+    >
+      <p className="text-xs text-blue-400">{item.status}</p>
+      <p className="text-xs text-slate-400 truncate">{item.summary}</p>
+    </div>
+  ))}
+</div>
+
+            </motion.div>
           )}
 
-        </div>
+        </motion.div>
 
       </main>
-    </div>
+    </motion.div>
   );
 }
 
