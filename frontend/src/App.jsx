@@ -286,6 +286,9 @@ useEffect(() => {
         </motion.div>
 
       </main>
+      <footer className="text-center text-xs text-slate-500 py-3 border-t border-white/10">
+      Built by Ravish • Full Stack Developer
+    </footer>
     </motion.div>
   );
 }
