@@ -16,7 +16,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [editorRef, setEditorRef] = useState(null);
   const [isGuest, setIsGuest] = useState(false);
-  const API = "http://localhost:5000";
+  const API = import.meta.env.VITE_API_URL;
 
   const templates = {
     javascript: `function helloWorld() {\n  console.log("Hello Ravish");\n}`,
