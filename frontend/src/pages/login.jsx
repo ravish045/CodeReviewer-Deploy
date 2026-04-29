@@ -53,7 +53,7 @@ export default function Login({ setToken, setIsGuest }) {
 
         {/* 🔥 Google Login */}
         <a
-          href="http://localhost:5000/auth/google"
+          href="https://codereviewer-deploy.onrender.com"
           className="block text-center bg-red-600 py-2 rounded hover:bg-red-500"
         >
           Continue with Google
